@@ -1,3 +1,3 @@
 # otus_python_hw
 
-vdsp@inbox.ru
+shsergey17@mail.ru
