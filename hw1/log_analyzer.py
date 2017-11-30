@@ -20,6 +20,15 @@ import logging
 
 LINE_REGEXP = re.compile(r"\"\S+ (\S+) \S+\" .+ (\S+)")
 
+config = {
+    "REPORT_SIZE": 1000,
+    "REPORT_DIR": "./reports",
+    "LOG_DIR": "./log",
+    "TS": "/tmp/log_nalyzer.ts",
+    "LOG_TEMPLATE": "nginx-access-ui\.log-(\d{8})(\.gz)*",
+    "APP_LOG_FILE": ""
+}
+
 
 def xreadlines(log_path):
     """
@@ -83,11 +92,6 @@ def save_report(report_path, template, stat_result):
     :return: void
     """
     try:
-        if not os.path.isfile(template):
-            raise Exception("%s: %s" % ("File not found", template))
-
-        if not os.access(template, os.W_OK):
-            raise Exception("%s: %s" % ("File not writable", template))
 
         with open(template) as file:
             text = file.read()
@@ -96,8 +100,10 @@ def save_report(report_path, template, stat_result):
         with open(report_path, "w") as file:
             file.write(text)
 
+        return True
+
     except OSError, e:
-        raise Exception("%s: %s" % (e.strerror, report_path))
+        raise Exception("%s: %s" % (e, report_path))
 
 
 def get_stat(log_lines):
@@ -143,7 +149,7 @@ def get_last_logfile(log_path):
     :return: list [макс дата, логфайл]
     """
     try:
-        pattern = r"(\d{8})"
+        pattern = r"nginx-access-ui\.log-(\d{8})"
         if not os.path.isdir(log_path):
             raise Exception("%s: %s" % ("Not found", log_path))
 
@@ -159,6 +165,16 @@ def get_last_logfile(log_path):
         raise Exception("%s: %s" % (e.strerror, log_path))
     except IndexError, e:
         raise Exception("%s: %s" % ("File not found", log_path))
+
+
+def create_ts(ts_file):
+    """
+    Создание ts file
+    :param ts_file:
+    :return: void
+    """
+    with open(ts_file, 'w') as file:
+        ts_file.write(str(datetime.datetime.now().timestamp()))
 
 
 def getopt():
@@ -199,8 +215,10 @@ def main(config):
     template = os.path.join(config.get("app", "report_dir"), "report.html")
 
     # Генерация отчета
-    save_report(report_file, template, stat_result)
-    logging.info("Create report %s" % report_file)
+    if save_report(report_file, template, stat_result):
+        logging.info("Create report %s" % report_file)
+        if "TS" in config and len(config["TS"]) > 0:
+            create_ts(config["TS"])
 
 
 def readconf(filename):
@@ -211,9 +229,26 @@ def readconf(filename):
     """
     if not os.path.isfile(filename):
         raise Exception("%s: %s" % ("File not found", filename))
-    config = ConfigParser.RawConfigParser()
-    config.read(filename)
-    return config
+
+    try:
+        with open(filename) as file:
+            return json.load(file.read())
+
+    except OSError, e:
+        raise Exception("%s: %s" % (e, filename))
+    #
+    #
+    # conf = ConfigParser.RawConfigParser()
+    # conf.read(filename)
+    #
+    # config = {
+    #     "REPORT_SIZE": conf.get("app"),
+    #     "REPORT_DIR": "./reports",
+    #     "LOG_DIR": "./log"
+    # }
+    #
+    #
+    # return config
 
 
 if __name__ == "__main__":
@@ -235,7 +270,10 @@ if __name__ == "__main__":
             params['filename'] = args.logfile
 
         logging.basicConfig(**params)
-        config = readconf(args.config)
+
+        if args.config:
+            config = readconf(args.config)
+
         main(config)
 
     except Exception as e:
