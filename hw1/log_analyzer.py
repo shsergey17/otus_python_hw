@@ -120,7 +120,7 @@ def get_stat(log_lines):
 
     stat_result = []
     total = len(group)
-    logging.debug("total: %d, total_request: %f" % (total, total_request))
+    # logging.debug("total: %d, total_request: %f" % (total, total_request))
     for item in group:
         item_request = item['request']
         stat_result.append({
@@ -179,31 +179,28 @@ def getopt():
 
 
 def main(config):
-    try:
-        # Последний лог файл и дата
-        date, logfile = get_last_logfile(config.get("app", "log_dir"))
-        # print "date: %s, logfile: %s" % (date, logfile)
-        logging.debug("date: %s, logfile: %s" % (date, logfile))
 
-        report_file = os.path.join(config.get("app", "report_dir"), "report-%s.html" % date)
-        if os.path.isfile(report_file):
-            raise Exception("%s: %s" % ("Report file already exists", report_file))
+    # Последний лог файл и дата
+    date, logfile = get_last_logfile(config.get("app", "log_dir"))
+    # print "date: %s, logfile: %s" % (date, logfile)
+    logging.info("date: %s, logfile: %s" % (date, logfile))
 
-        # Чтение файла
-        log_lines = xreadlines(logfile)
+    report_file = os.path.join(config.get("app", "report_dir"), "report-%s.html" % date)
+    if os.path.isfile(report_file):
+        raise Exception("%s: %s" % ("Report file already exists", report_file))
 
-        # Получение статистики
-        stat_result = get_stat(log_lines)
+    # Чтение файла
+    log_lines = xreadlines(logfile)
 
-        # Загрузка шаблона
-        template = os.path.join(config.get("app", "report_dir"), "report.html")
+    # Получение статистики
+    stat_result = get_stat(log_lines)
 
-        # Генерация отчета
-        save_report(report_file, template, stat_result)
-        logging.info("Create report %s" % report_file)
+    # Загрузка шаблона
+    template = os.path.join(config.get("app", "report_dir"), "report.html")
 
-    except Exception as e:
-        logging.error(e.message)
+    # Генерация отчета
+    save_report(report_file, template, stat_result)
+    logging.info("Create report %s" % report_file)
 
 
 def readconf(filename):
@@ -227,16 +224,19 @@ if __name__ == "__main__":
         
         python -m unittest discover -p test_log_analyzer.py
     """
-    args = getopt()
-    params = {
-        'format': u'[%(asctime)s] %(levelname)-8s %(message)s',
-        # DEBUG INFO WARNING ERROR
-        'level': logging.DEBUG
-    }
-    if args.logfile:
-        params['filename'] = args.logfile
+    try:
+        args = getopt()
+        params = {
+            'format': u'[%(asctime)s] %(levelname)-8s %(message)s',
+            # DEBUG INFO WARNING ERROR
+            'level': logging.INFO
+        }
+        if args.logfile:
+            params['filename'] = args.logfile
 
-    logging.basicConfig(**params)
-    config = readconf(args.config)
-    main(config)
+        logging.basicConfig(**params)
+        config = readconf(args.config)
+        main(config)
 
+    except Exception as e:
+        logging.exception(e.message)
