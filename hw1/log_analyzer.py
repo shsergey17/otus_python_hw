@@ -22,11 +22,11 @@ LINE_REGEXP = re.compile(r"\"\S+ (\S+) \S+\" .+ (\S+)")
 
 
 def xreadlines(log_path):
-    '''
+    """
     Чтение файла
     :param log_path: лог
     :return: iterator
-    '''
+    """
     if log_path.endswith(".gz"):
         log = gzip.open(log_path, 'rb')
     else:
@@ -39,16 +39,15 @@ def xreadlines(log_path):
             processed += 1
             yield parsed_line
 
-    logging.debug("%s of %s lines processed" % (processed, total))
     log.close()
 
 
 def process_line(line):
-    '''
+    """
     Поиск
     :param line: list
     :return: list
-    '''
+    """
     regex = r"\"\S+ (\S+) \S+\" .+ (\S+)"
     matches = re.search(regex, line)
     if matches:
@@ -56,11 +55,11 @@ def process_line(line):
 
 
 def median(lists):
-    '''
+    """
     Медиана
-    :param thelist: list
+    :param lists: list
     :return: float
-    '''
+    """
     median = 0
     sortedlist = sorted(lists)
     lengthofthelist = len(sortedlist)
@@ -77,12 +76,12 @@ def median(lists):
 
 
 def save_report(report_path, template, stat_result):
-    '''
+    """
     :param report_path: str путь к папке отчетов
     :param template: шаблон
     :param stat_result: dict статистика
     :return: void
-    '''
+    """
     try:
         if not os.path.isfile(template):
             raise Exception("%s: %s" % ("File not found", template))
@@ -102,11 +101,11 @@ def save_report(report_path, template, stat_result):
 
 
 def get_stat(log_lines):
-    '''
+    """
     Генерация статистики
     :param log_lines: list
     :return: list
-    '''
+    """
     total_request = 0
     group = []
     for url, request_times in groupby(sorted(log_lines, key=lambda x: x[0]), key=lambda x: x[0]):
@@ -138,11 +137,11 @@ def get_stat(log_lines):
 
 
 def get_last_logfile(log_path):
-    '''
+    """
     Поиска лог файла и максимальной даты
     :param log_path:  путь к логам
     :return: list [макс дата, логфайл]
-    '''
+    """
     try:
         pattern = r"(\d{8})"
         if not os.path.isdir(log_path):
@@ -163,10 +162,10 @@ def get_last_logfile(log_path):
 
 
 def getopt():
-    '''
+    """
     Аргументы к скрипту
     :return: args
-    '''
+    """
     parser = argparse.ArgumentParser("Process log files")
     parser.add_argument("--config",
                         dest="config",
@@ -208,11 +207,11 @@ def main(config):
 
 
 def readconf(filename):
-    '''
+    """
     Чтение конфигурации
     :param filename:
     :return: config
-    '''
+    """
     if not os.path.isfile(filename):
         raise Exception("%s: %s" % ("File not found", filename))
     config = ConfigParser.RawConfigParser()
