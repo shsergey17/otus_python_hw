@@ -62,7 +62,8 @@ class TestMethods(unittest.TestCase):
         filename = "./test/nginx-access-ui-bad.log-20170731.gz"
 
         with self.assertRaises(Exception):
-            log_analyzer.xreadlines(filename)
+            res = log_analyzer.xreadlines(filename)
+            res.next()
 
 
     def test_log_file_not_found(self):
