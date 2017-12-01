@@ -10,6 +10,7 @@ from itertools import groupby
 import os.path
 import logging
 import itertools
+import time
 
 
 # log_format ui_short '$remote_addr $remote_user $http_x_real_ip [$time_local] "$request" '
@@ -34,7 +35,7 @@ config = {
     "TS": "./log_analyzer.ts",
 
     # шаблон для поиска логов
-    "LOG_TEMPLATE": "nginx-access-ui\.log-(\d{8})(\.gz)*",
+    "LOG_TEMPLATE": "nginx-access-ui\.log-(\d{8})[\.gz]*",
 
     # лог файл скрипта
     "APP_LOG_FILE": ""
@@ -47,19 +48,23 @@ def xreadlines(log_path):
     :param log_path: лог
     :return: iterator
     """
-    if log_path.endswith(".gz"):
-        log = gzip.open(log_path, 'rb')
-    else:
-        log = open(log_path)
-    total = processed = 0
-    for line in log:
-        parsed_line = process_line(line)
-        total += 1
-        if parsed_line:
-            processed += 1
-            yield parsed_line
+    try:
+        if log_path.endswith(".gz"):
+            log = gzip.open(log_path, 'rb')
+        else:
+            log = open(log_path)
+        total = processed = 0
+        for line in log:
+            parsed_line = process_line(line)
+            total += 1
+            if parsed_line:
+                processed += 1
+                yield parsed_line
 
-    log.close()
+        logging.info("%s of %s lines processed" % (processed, total))
+        log.close()
+    except IOError, e:
+        raise Exception("%s: %s" % (e, log_path))
 
 
 def process_line(line):
@@ -160,7 +165,7 @@ def get_last_logfile(log_path):
     :return: list [макс дата, логфайл]
     """
     try:
-        pattern = r"nginx-access-ui\.log-(\d{8})"
+        pattern = re.compile(config["LOG_TEMPLATE"])
         if not os.path.isdir(log_path):
             raise Exception("%s: %s" % ("Not found", log_path))
 
@@ -170,7 +175,7 @@ def get_last_logfile(log_path):
             matches = re.findall(pattern, log)
             if matches:
                 if matches[0] == max_date:
-                    return [str(datetime.datetime.strptime(max_date, "%Y%m%d").date()), log]
+                    return {"maxdate": str(datetime.datetime.strptime(max_date, "%Y%m%d").date()), "logfile": log}
 
     except OSError, e:
         raise Exception("%s: %s" % (e.strerror, log_path))
@@ -185,7 +190,7 @@ def create_ts(ts_file):
     :return: void
     """
     with open(ts_file, 'w') as file:
-        ts_file.write(str(datetime.datetime.now().timestamp()))
+        file.write(str("%d" % time.time()))
 
 
 def getopt():
@@ -196,34 +201,30 @@ def getopt():
     parser = argparse.ArgumentParser("Process log files")
     parser.add_argument("--config",
                         dest="config",
-                        default="./log_analyzer.cfg",
-                        help="Config file")
-    parser.add_argument("--logfile",
-                        dest="logfile",
                         default=None,
-                        help="logfile")
+                        help="Config file")
     return parser.parse_args()
 
 
 def main(config):
 
     # Последний лог файл и дата
-    date, logfile = get_last_logfile(config.get("app", "log_dir"))
+    Log = get_last_logfile(config["LOG_DIR"])
     # print "date: %s, logfile: %s" % (date, logfile)
-    logging.info("date: %s, logfile: %s" % (date, logfile))
+    logging.info("date: %s, logfile: %s" % (Log["maxdate"], Log["logfile"]))
 
-    report_file = os.path.join(config.get("app", "report_dir"), "report-%s.html" % date)
+    report_file = os.path.join(config["REPORT_DIR"], "report-%s.html" % Log["maxdate"])
     if os.path.isfile(report_file):
         raise Exception("%s: %s" % ("Report file already exists", report_file))
 
     # Чтение файла
-    log_lines = xreadlines(logfile)
+    log_lines = xreadlines(Log["logfile"])
 
     # Получение статистики
     stat_result = get_stat(log_lines)
 
     # Загрузка шаблона
-    template = os.path.join(config.get("app", "report_dir"), "report.html")
+    template = os.path.join(config["REPORT_DIR"], "report.html")
 
     # Генерация отчета
     if save_report(report_file, template, stat_result):
@@ -268,7 +269,7 @@ if __name__ == "__main__":
         config = readconf(args.config)
 
     if config["APP_LOG_FILE"]:
-        params['filename'] = args.logfile
+        params['filename'] = config["APP_LOG_FILE"]
 
     logging.basicConfig(**params)
 
