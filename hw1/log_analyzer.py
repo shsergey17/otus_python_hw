@@ -7,9 +7,9 @@ import datetime
 import json
 import argparse
 from itertools import groupby
-import ConfigParser
 import os.path
 import logging
+import itertools
 
 
 # log_format ui_short '$remote_addr $remote_user $http_x_real_ip [$time_local] "$request" '
@@ -21,11 +21,22 @@ import logging
 LINE_REGEXP = re.compile(r"\"\S+ (\S+) \S+\" .+ (\S+)")
 
 config = {
+    # Размер отчета
     "REPORT_SIZE": 1000,
+
+    # Путь к папке с отчетами
     "REPORT_DIR": "./reports",
+
+    # Путь к папке с логами
     "LOG_DIR": "./log",
-    "TS": "/tmp/log_nalyzer.ts",
+
+    # ts-file
+    "TS": "./log_analyzer.ts",
+
+    # шаблон для поиска логов
     "LOG_TEMPLATE": "nginx-access-ui\.log-(\d{8})(\.gz)*",
+
+    # лог файл скрипта
     "APP_LOG_FILE": ""
 }
 
@@ -139,7 +150,7 @@ def get_stat(log_lines):
             'time_perc': round(100 * sum(item_request) / float(total_request), 3),
             'percent': round(100 * len(item_request) / float(total), 3),
         })
-    return sorted(stat_result, key=lambda r: r["time_sum"], reverse=True)[:1000]
+    return sorted(stat_result, key=lambda r: r["time_sum"], reverse=True)[:config["REPORT_SIZE"]]
 
 
 def get_last_logfile(log_path):
@@ -217,7 +228,8 @@ def main(config):
     # Генерация отчета
     if save_report(report_file, template, stat_result):
         logging.info("Create report %s" % report_file)
-        if "TS" in config and len(config["TS"]) > 0:
+
+        if config["TS"]:
             create_ts(config["TS"])
 
 
@@ -227,28 +239,14 @@ def readconf(filename):
     :param filename:
     :return: config
     """
-    if not os.path.isfile(filename):
-        raise Exception("%s: %s" % ("File not found", filename))
-
     try:
         with open(filename) as file:
-            return json.load(file.read())
+            new_conf = json.load(file.read())
+
+        return dict(itertools.chain(config.iteritems(), new_conf.iteritems()))
 
     except OSError, e:
         raise Exception("%s: %s" % (e, filename))
-    #
-    #
-    # conf = ConfigParser.RawConfigParser()
-    # conf.read(filename)
-    #
-    # config = {
-    #     "REPORT_SIZE": conf.get("app"),
-    #     "REPORT_DIR": "./reports",
-    #     "LOG_DIR": "./log"
-    # }
-    #
-    #
-    # return config
 
 
 if __name__ == "__main__":
@@ -259,20 +257,22 @@ if __name__ == "__main__":
         
         python -m unittest discover -p test_log_analyzer.py
     """
+    args = getopt()
+    params = {
+        'format': u'[%(asctime)s] %(levelname)-8s %(message)s',
+        # DEBUG INFO WARNING ERROR
+        'level': logging.INFO
+    }
+
+    if args.config:
+        config = readconf(args.config)
+
+    if config["APP_LOG_FILE"]:
+        params['filename'] = args.logfile
+
+    logging.basicConfig(**params)
+
     try:
-        args = getopt()
-        params = {
-            'format': u'[%(asctime)s] %(levelname)-8s %(message)s',
-            # DEBUG INFO WARNING ERROR
-            'level': logging.INFO
-        }
-        if args.logfile:
-            params['filename'] = args.logfile
-
-        logging.basicConfig(**params)
-
-        if args.config:
-            config = readconf(args.config)
 
         main(config)
 
