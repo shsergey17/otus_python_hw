@@ -274,4 +274,4 @@ if __name__ == "__main__":
         main(config)
 
     except Exception as e:
-        logging.exception(e.message)
+        logging.exception()
