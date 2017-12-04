@@ -189,8 +189,9 @@ def create_ts(ts_file):
     :param ts_file:
     :return: void
     """
-    with open(ts_file, 'w') as file:
-        file.write(str("%d" % time.time()))
+    if config["TS"]:
+        with open(ts_file, 'w') as file:
+            file.write(str("%d" % time.time()))
 
 
 def getopt():
@@ -201,16 +202,14 @@ def getopt():
     parser = argparse.ArgumentParser("Process log files")
     parser.add_argument("--config",
                         dest="config",
-                        default=None,
+                        default="./log_analyzer.conf",
                         help="Config file")
     return parser.parse_args()
 
 
 def main(config):
-
-    # Последний лог файл и дата
     Log = get_last_logfile(config["LOG_DIR"])
-    # print "date: %s, logfile: %s" % (date, logfile)
+
     logging.info("date: %s, logfile: %s" % (Log["maxdate"], Log["logfile"]))
 
     report_file = os.path.join(config["REPORT_DIR"], "report-%s.html" % Log["maxdate"])
@@ -229,9 +228,7 @@ def main(config):
     # Генерация отчета
     if save_report(report_file, template, stat_result):
         logging.info("Create report %s" % report_file)
-
-        if config["TS"]:
-            create_ts(config["TS"])
+        create_ts(config["TS"])
 
 
 def readconf(filename):
@@ -241,10 +238,10 @@ def readconf(filename):
     :return: config
     """
     try:
-        with open(filename) as file:
-            new_conf = json.load(file.read())
+        with open(filename, 'r') as file:
+            config.update(json.loads(file.read()))
 
-        return dict(itertools.chain(config.iteritems(), new_conf.iteritems()))
+        return config
 
     except OSError, e:
         raise Exception("%s: %s" % (e, filename))
@@ -274,7 +271,6 @@ if __name__ == "__main__":
     logging.basicConfig(**params)
 
     try:
-
         main(config)
 
     except Exception as e:
