@@ -41,6 +41,10 @@ config = {
     "APP_LOG_FILE": ""
 }
 
+class StopScript(Exception):
+    def __init__(self,text):
+        StopScript.message = text
+
 
 def xreadlines(log_path):
     """
@@ -132,13 +136,13 @@ def get_stat(log_lines):
     group = []
     for url, request_times in groupby(sorted(log_lines, key=lambda x: x[0]), key=lambda x: x[0]):
         times = []
-        dict = {}
+        result = {}
         for c, request_time in request_times:
             times.append(float(request_time))
-            dict['url'] = url
-            dict['request'] = times
+            result['url'] = url
+            result['request'] = times
             total_request += float(request_time)
-        group.append(dict)
+        group.append(result)
 
     stat_result = []
     total = len(group)
@@ -169,14 +173,20 @@ def get_last_logfile(log_path):
         if not os.path.isdir(log_path):
             raise Exception("%s: %s" % ("Not found", log_path))
 
-        logs = [os.path.join(log_path, logfile) for logfile in os.listdir(log_path)]
-        max_date = max([re.findall(pattern, log) for log in logs])[0]
-        for log in logs:
-            matches = re.findall(pattern, log)
-            if matches:
-                if matches[0] == max_date:
-                    Log = namedtuple('Log', ['maxdate', 'logfile'])
-                    return Log(str(datetime.datetime.strptime(max_date, "%Y%m%d").date()), log)
+        Log = namedtuple('Log', ['maxdate', 'logfile'])
+        max_date = 0
+        file = ''
+        for logfile in os.listdir(log_path):
+            find = re.findall(pattern, logfile)
+            if find and max_date < find:
+                max_date, file = find[0], os.path.join(log_path, logfile)
+
+        if max_date:
+            max_date = str(datetime.datetime.strptime(max_date, "%Y%m%d").date())
+        else:
+            raise StopScript("%s: %s" % ("File not found", log_path))
+
+        return Log(max_date, file)
 
     except OSError, e:
         raise Exception("%s: %s" % (e.strerror, log_path))
@@ -215,7 +225,7 @@ def main(config):
 
     report_file = os.path.join(config["REPORT_DIR"], "report-%s.html" % Log.maxdate)
     if os.path.isfile(report_file):
-        raise Exception("%s: %s" % ("Report file already exists", report_file))
+        raise StopScript("%s: %s" % ("Report file already exists", report_file))
 
     # Чтение файла
     log_lines = xreadlines(Log.logfile)
@@ -229,7 +239,7 @@ def main(config):
     # Генерация отчета
     if save_report(report_file, template, stat_result):
         logging.info("Create report %s" % report_file)
-        create_ts(config["TS"])
+    create_ts(config["TS"])
 
 
 def readconf(filename):
@@ -259,12 +269,10 @@ if __name__ == "__main__":
     args = getopt()
     params = {
         'format': u'[%(asctime)s] %(levelname)-8s %(message)s',
-        # DEBUG INFO WARNING ERROR
         'level': logging.INFO
     }
 
-    if args.config:
-        config = readconf(args.config)
+    config = readconf(args.config)
 
     if config["APP_LOG_FILE"]:
         params['filename'] = config["APP_LOG_FILE"]
@@ -274,5 +282,7 @@ if __name__ == "__main__":
     try:
         main(config)
 
+    except StopScript as e:
+        logging.info(e.message)
     except Exception as e:
         logging.exception(e)
