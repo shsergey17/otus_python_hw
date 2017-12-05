@@ -11,7 +11,7 @@ import os.path
 import logging
 import itertools
 import time
-
+from collections import namedtuple
 
 # log_format ui_short '$remote_addr $remote_user $http_x_real_ip [$time_local] "$request" '
 #                     '$status $body_bytes_sent "$http_referer" '
@@ -175,7 +175,8 @@ def get_last_logfile(log_path):
             matches = re.findall(pattern, log)
             if matches:
                 if matches[0] == max_date:
-                    return {"maxdate": str(datetime.datetime.strptime(max_date, "%Y%m%d").date()), "logfile": log}
+                    Log = namedtuple('Log', ['maxdate', 'logfile'])
+                    return Log(str(datetime.datetime.strptime(max_date, "%Y%m%d").date()), log)
 
     except OSError, e:
         raise Exception("%s: %s" % (e.strerror, log_path))
@@ -210,14 +211,14 @@ def getopt():
 def main(config):
     Log = get_last_logfile(config["LOG_DIR"])
 
-    logging.info("date: %s, logfile: %s" % (Log["maxdate"], Log["logfile"]))
+    logging.info("date: %s, logfile: %s" % (Log.maxdate, Log.logfile))
 
-    report_file = os.path.join(config["REPORT_DIR"], "report-%s.html" % Log["maxdate"])
+    report_file = os.path.join(config["REPORT_DIR"], "report-%s.html" % Log.maxdate)
     if os.path.isfile(report_file):
         raise Exception("%s: %s" % ("Report file already exists", report_file))
 
     # Чтение файла
-    log_lines = xreadlines(Log["logfile"])
+    log_lines = xreadlines(Log.logfile)
 
     # Получение статистики
     stat_result = get_stat(log_lines)
@@ -274,4 +275,4 @@ if __name__ == "__main__":
         main(config)
 
     except Exception as e:
-        logging.exception()
+        logging.exception(e)
