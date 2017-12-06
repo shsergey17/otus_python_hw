@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
+import sys
 import re
 import gzip
 import datetime
@@ -9,9 +10,9 @@ import argparse
 from itertools import groupby
 import os.path
 import logging
-import itertools
 import time
 from collections import namedtuple
+import shutil
 
 # log_format ui_short '$remote_addr $remote_user $http_x_real_ip [$time_local] "$request" '
 #                     '$status $body_bytes_sent "$http_referer" '
@@ -81,8 +82,7 @@ def process_line(line):
     :param line: list
     :return: list
     """
-    regex = r"\"\S+ (\S+) \S+\" .+ (\S+)"
-    matches = re.search(regex, line)
+    matches = re.search(LINE_REGEXP, line)
     if matches:
         return [matches.group(1), matches.group(2)]
 
@@ -121,8 +121,12 @@ def save_report(report_path, template, stat_result):
             text = file.read()
         text = text.replace('$table_json', json.dumps(stat_result))
 
-        with open(report_path, "w") as file:
+        tmp_report = report_path + '.tmp'
+
+        with open(tmp_report, "w") as file:
             file.write(text)
+
+        shutil.move(tmp_report, report_path)
 
         return True
 
@@ -188,12 +192,13 @@ def get_last_logfile(log_path):
         if max_date:
             max_date = str(datetime.datetime.strptime(max_date, "%Y%m%d").date())
         else:
-            raise Exception("%s: %s" % ("File not found", log_path))
+            logging.info("%s: %s" % ("File not found", log_path))
+            sys.exit(0)
 
         return Log(max_date, findfile)
 
     except OSError, e:
-        raise Exception("%s: %s" % (e.strerror, log_path))
+        raise Exception("%s: %s" % (e, log_path))
 
 
 def create_ts(ts_file):
