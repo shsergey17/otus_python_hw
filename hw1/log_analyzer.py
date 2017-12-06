@@ -41,11 +41,6 @@ config = {
     "APP_LOG_FILE": ""
 }
 
-class StopScript(Exception):
-    def __init__(self,text):
-        StopScript.message = text
-
-
 def xreadlines(log_path):
     """
     Чтение файла
@@ -166,7 +161,7 @@ def get_last_logfile(log_path):
     """
     Поиска лог файла и максимальной даты
     :param log_path:  путь к логам
-    :return: list [макс дата, логфайл]
+    :return: Log [макс дата, логфайл]
     """
     try:
         pattern = re.compile(config["LOG_TEMPLATE"])
@@ -175,23 +170,21 @@ def get_last_logfile(log_path):
 
         Log = namedtuple('Log', ['maxdate', 'logfile'])
         max_date = 0
-        file = ''
+        findfile = ''
         for logfile in os.listdir(log_path):
             find = re.findall(pattern, logfile)
             if find and max_date < find:
-                max_date, file = find[0], os.path.join(log_path, logfile)
+                max_date, findfile = find[0], os.path.join(log_path, logfile)
 
         if max_date:
             max_date = str(datetime.datetime.strptime(max_date, "%Y%m%d").date())
         else:
-            raise StopScript("%s: %s" % ("File not found", log_path))
+            raise Exception("%s: %s" % ("File not found", log_path))
 
-        return Log(max_date, file)
+        return Log(max_date, findfile)
 
     except OSError, e:
         raise Exception("%s: %s" % (e.strerror, log_path))
-    except IndexError, e:
-        raise Exception("%s: %s" % ("File not found", log_path))
 
 
 def create_ts(ts_file):
@@ -225,7 +218,7 @@ def main(config):
 
     report_file = os.path.join(config["REPORT_DIR"], "report-%s.html" % Log.maxdate)
     if os.path.isfile(report_file):
-        raise StopScript("%s: %s" % ("Report file already exists", report_file))
+        raise Warning("%s: %s" % ("Report file already exists", report_file))
 
     # Чтение файла
     log_lines = xreadlines(Log.logfile)
@@ -282,7 +275,7 @@ if __name__ == "__main__":
     try:
         main(config)
 
-    except StopScript as e:
-        logging.info(e.message)
+    except Warning as e:
+        logging.info(e)
     except Exception as e:
         logging.exception(e)

@@ -78,5 +78,10 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(log_analyzer.process_line(text_1), ['/api/v2/banner/25047606', '2.490'])
         self.assertIsNone(log_analyzer.process_line(text_2))
 
+    def test_very_bad_line(self):
+        text_1 = """123123123123"""
+
+        self.assertEqual(log_analyzer.process_line(text_1), None)
+
 if __name__ == '__main__':
     unittest.main()
