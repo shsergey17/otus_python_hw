@@ -5,8 +5,7 @@
 import unittest
 import os
 import log_analyzer
-
-#nginx-access[^\d]*(\d{8})[\.gz]*
+from collections import namedtuple
 
 class TestMethods(unittest.TestCase):
 
@@ -16,9 +15,9 @@ class TestMethods(unittest.TestCase):
             file.write("test")
 
         log_analyzer.config["LOG_TEMPLATE"] = "test-(\d{8})[\.gz]*"
-        self.assertEqual(log_analyzer.get_last_logfile("./"), {"maxdate":'2017-06-01', "logfile":'./test-20170601'})
+        Log = namedtuple('Log', ['maxdate', 'logfile'])
+        self.assertEqual(log_analyzer.get_last_logfile("./"), Log(maxdate='2017-06-01', logfile='./test-20170601'))
         os.remove(filename)
-
 
     def test_get_stat(self):
         lines = [['test', 1]]
@@ -26,15 +25,12 @@ class TestMethods(unittest.TestCase):
         'time_perc': 100.0, 'percent': 100.0}]
         self.assertEqual(log_analyzer.get_stat(lines), ok)
 
-
     def test_median(self):
         self.assertEqual(log_analyzer.median([1,2,3,4,5,6]), 3.5)
-
 
     def test_process_line(self):
         text = """1.196.116.32 -  - [29/Jun/2017:03:50:23 +0300] "GET /api/v2/banner/25047606 HTTP/1.1" 200 959 "-" "Lynx/2.8.8dev.9 libwww-FM/2.14 SSL-MM/1.4.1 GNUTLS/2.10.5" "-" "1498697422-2190034393-4708-9752766" "dc7161be3" 2.490"""
         self.assertEqual(log_analyzer.process_line(text), ['/api/v2/banner/25047606', '2.490'])
-
 
     def test_xreadlines(self):
         filename = os.path.join("./", "test-20170601")
@@ -47,7 +43,6 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(res, ['/api/v2/banner/25047606', '2.490'])
         os.remove(filename)
 
-
     def test_create_ts(self):
         filename = "./test.ts"
         log_analyzer.create_ts("./test.ts")
@@ -57,7 +52,6 @@ class TestMethods(unittest.TestCase):
         self.assertEqual(len(ts), 10)
         os.remove(filename)
 
-
     def test_bad_gz(self):
         filename = "./test/nginx-access-ui-bad.log-20170731.gz"
 
@@ -65,11 +59,9 @@ class TestMethods(unittest.TestCase):
             res = log_analyzer.xreadlines(filename)
             res.next()
 
-
     def test_log_file_not_found(self):
         with self.assertRaises(Exception):
             log_analyzer.get_last_logfile("./folder_not_exists")
-
 
     def test_bad_line(self):
         text_1 = """1.196.116.32 -  - [29/Jun/2017:03:50:23 +0300] "GET /api/v2/banner/25047606 HTTP/1.1" 200 959 "-" "Lynx/2.8.8dev.9 libwww-FM/2.14 SSL-MM/1.4.1 GNUTLS/2.10.5" "-" "1498697422-2190034393-4708-9752766" "dc7161be3" 2.490"""
@@ -80,8 +72,28 @@ class TestMethods(unittest.TestCase):
 
     def test_very_bad_line(self):
         text_1 = """123123123123"""
-
         self.assertEqual(log_analyzer.process_line(text_1), None)
+
+    def test_error_threshold(self):
+        filename = os.path.join("./", "test-20170602")
+        oktext = """1.196.116.32 -  - [29/Jun/2017:03:50:23 +0300] "GET /api/v2/banner/25047606 HTTP/1.1" 200 959 "-" "Lynx/2.8.8dev.9 libwww-FM/2.14 SSL-MM/1.4.1 GNUTLS/2.10.5" "-" "1498697422-2190034393-4708-9752766" "dc7161be3" 2.490"""
+        badtext = """bad text"""
+        text = ""
+        log_analyzer.config["LOG_ERROR_THRESHOLD_PERCENT"] = 50
+        for i in range(10):
+            if i < 4:
+                text += oktext + "\n"
+            else:
+                text += badtext + "\n"
+
+        with open(filename, "w") as file:
+            file.write(text)
+
+        with self.assertRaisesRegexp(Exception, 'Bug threshold exceeded %d of %d' % (60, log_analyzer.config["LOG_ERROR_THRESHOLD_PERCENT"])):
+            for a in log_analyzer.xreadlines(filename):
+                res = a
+
+        os.remove(filename)
 
 if __name__ == '__main__':
     unittest.main()

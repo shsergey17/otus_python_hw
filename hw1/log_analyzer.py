@@ -38,8 +38,12 @@ config = {
     "LOG_TEMPLATE": "nginx-access-ui\.log-(\d{8})[\.gz]*",
 
     # лог файл скрипта
-    "APP_LOG_FILE": ""
+    "APP_LOG_FILE": "",
+
+    # Ошибка при привышении ошибочных строк в логе, в процентах
+    "LOG_ERROR_THRESHOLD_PERCENT": 50
 }
+
 
 def xreadlines(log_path):
     """
@@ -62,6 +66,11 @@ def xreadlines(log_path):
 
         logging.info("%s of %s lines processed" % (processed, total))
         log.close()
+
+        percent = round((total - processed) * 100 / total)
+        if percent > config['LOG_ERROR_THRESHOLD_PERCENT']:
+            raise Exception('Bug threshold exceeded %d of %d' % (percent, config["LOG_ERROR_THRESHOLD_PERCENT"]))
+
     except IOError, e:
         raise Exception("%s: %s" % (e, log_path))
 
@@ -218,7 +227,8 @@ def main(config):
 
     report_file = os.path.join(config["REPORT_DIR"], "report-%s.html" % Log.maxdate)
     if os.path.isfile(report_file):
-        raise Warning("%s: %s" % ("Report file already exists", report_file))
+        logging.info("%s: %s" % ("Report file already exists", report_file))
+        return
 
     # Чтение файла
     log_lines = xreadlines(Log.logfile)
