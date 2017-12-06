@@ -179,7 +179,8 @@ def get_last_logfile(log_path):
     try:
         pattern = re.compile(config["LOG_TEMPLATE"])
         if not os.path.isdir(log_path):
-            raise Exception("%s: %s" % ("Not found", log_path))
+            logging.info("%s: %s" % ("Not found", log_path))
+            sys.exit(0)
 
         Log = namedtuple('Log', ['maxdate', 'logfile'])
         max_date = 0
