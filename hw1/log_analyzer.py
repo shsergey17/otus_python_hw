@@ -13,6 +13,8 @@ import logging
 import time
 from collections import namedtuple
 import shutil
+import codecs
+
 
 # log_format ui_short '$remote_addr $remote_user $http_x_real_ip [$time_local] "$request" '
 #                     '$status $body_bytes_sent "$http_referer" '
@@ -56,9 +58,10 @@ def xreadlines(log_path):
         if log_path.endswith(".gz"):
             log = gzip.open(log_path, 'rb')
         else:
-            log = open(log_path)
+            log = codecs.open(log_path, 'rt', encoding="utf-8")
         total = processed = 0
         for line in log:
+            # .decode("utf-8", "replace"
             parsed_line = process_line(line)
             total += 1
             if parsed_line:
@@ -123,7 +126,7 @@ def save_report(report_path, template, stat_result):
 
         tmp_report = report_path + '.tmp'
 
-        with open(tmp_report, "w") as file:
+        with codecs.open(tmp_report, "wt", encoding="utf-8") as file:
             file.write(text)
 
         shutil.move(tmp_report, report_path)
@@ -162,6 +165,7 @@ def get_stat(log_lines):
             'time_avg': round(sum(item_request) / len(item_request), 3),
             'time_max': max(item_request),
             'time_sum': round(sum(item_request), 3),
+            # 'url': item['url'].decode("utf-8", "replace").encode("utf-8"),
             'url': item['url'],
             'time_med': round(median(item_request), 3),
             'time_perc': round(100 * sum(item_request) / float(total_request), 3),
